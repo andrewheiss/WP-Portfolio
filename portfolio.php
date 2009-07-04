@@ -101,7 +101,7 @@ class Portfolio
 		$query = "SELECT * FROM $this->portfolio_table";
 		$fullList = mysql_query($query);
 		
-		$page = $_GET['page'];
+		$page = $_GET['page']; // TODO: Sanitize this?
 		
 		?>
 	<div class="wrap">
@@ -145,6 +145,8 @@ class Portfolio
 
 
 	function editIndividual($entryID = 0, $errors = "", $message = "") {
+		$already_filled = false;
+		
 		if ($entryID == 0) {
 			# Add a new entry
 			$buttonTitle = "Add entry";
@@ -162,10 +164,12 @@ class Portfolio
 				$image = trim(mysql_result($result, 0, "project_image"));
 				$link = trim(mysql_result($result, 0, "project_link"));
 				$title = trim(mysql_result($result, 0, "project_title"));
-				$type = trim(mysql_result($result, 0, "project_type"));
+				$type = trim(mysql_result($result, 0, "project_type")); // TODO: Put project types in separate table, add plugin page
 				$id = trim(mysql_result($result, 0, "id_portfolio")); // TODO: Rename to id_project, use $project throughout
 				
 				$pageTitle = "Edit $title";
+			} else {
+				$this->showList(); // Invalid entry ID
 			}
 		}
 		
@@ -227,6 +231,11 @@ class Portfolio
 						<input type="hidden" name="id_portfolio" value="<?php echo $id; ?>" />
 						<input type="hidden" name="submit_check" value="1" />
 						<input class="button-primary" type="submit" value="<?php echo $buttonTitle; ?>" />
+						<?php
+							if ($already_filled == true) {
+								?><input class="button" type="submit" name="delete_entry" value="Delete" /><?php
+							}
+						?>
 					</td>
 				</tr>
 			</table>

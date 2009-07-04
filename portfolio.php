@@ -8,9 +8,11 @@ Author: Andrew Heiss
 Author URI: http://www.andrewheiss.com/
 */
 
+// error_reporting(E_ALL);
 $portfolio = new Portfolio();
 add_action( 'admin_menu', array(&$portfolio, 'addAdminMenu') );
-
+// require('lib/markdown.php');
+// require('lib/smartypants.php');
 
 /**
 * WP Portfolio
@@ -25,20 +27,32 @@ class Portfolio
 	{
 		add_option("portfolio_table", "ah_portfolio");
 		$this->portfolio_table = get_option('portfolio_table');
+		// if (!function_exists("Markdown")) {
+		// 	require (dirname(__FILE__).'/lib/markdown.php');
+		// }
+		// if (!function_exists("SmartyPants")) {
+		// 	require (dirname(__FILE__).'/lib/smartypants.php');
+		// }
+	}
+	
+	function niceHTML($text) {
+		$html = SmartyPants(Markdown($text));
+		return $html;
 	}
 	
 	function addAdminMenu() {
 		
 		add_menu_page('Portfolio Settings', 'Portfolio', 8, __FILE__, array(&$this, 'portfolioOptions'));
 		add_submenu_page(__FILE__, 'Portfolio settings', 'Settings', 8, __FILE__, array(&$this, 'portfolioOptions'));
-		add_submenu_page(__FILE__, 'Edit Portfolio Entries', 'Edit Portfolio Entries', 8, 'portfolio-edit', array(&$this, 'editEntries'));	
+		add_submenu_page(__FILE__, 'Manage Portfolio Entries', 'Edit Portfolio Entries', 8, 'portfolio-edit', array(&$this, 'editEntries'));
+		add_submenu_page(__FILE__, 'Manage Project Types', 'Manage Project Types', 8, 'portfolio-types-edit', array(&$this, 'editTypes'));	
 	}
 	
 	function portfolioOptions() {
 		echo '<div class="wrap">';
 		echo "<div id=\"icon-options-general\" class=\"icon32\"><br/></div>";
 		echo "<h2>Coming Soon Page</h2>";
-		echo '<p>Here is where the options would go if I actually had options.</p>';
+		echo '<p>Here is where the "options" would go if I *actually* _had_ options.</p>';
 		echo "<p>Check <a href=\"http://codex.wordpress.org/Creating_Options_Pages\" title=\"Creating Options Pages &laquo; WordPress Codex\">here</a> for more information.</p>";
 		echo '</div>';
 	}
@@ -62,17 +76,27 @@ class Portfolio
 		}
 	}
 	
+	function editTypes()
+	{
+		echo "Here's where you can manage the types of projects";
+	}
+	
 	function processForm() {
 		$title = wp_filter_nohtml_kses($_POST['project_title']);
-		$image = wp_filter_kses($_POST['project_image']);
-		$date = wp_filter_nohtml_kses($_POST['project_date']);
-		$type = wp_filter_nohtml_kses($_POST['project_type']);
-		$link = wp_filter_nohtml_kses($_POST['project_link']);
 		$description = wp_filter_kses($_POST['project_description']); // FIXME: This strips out <p>s, but shouldn't
-		// FUTURE: Use Markdown instead
-		$id = intval($_POST['id_portfolio']);
+		$image = wp_filter_kses($_POST['project_image']);
+		$link = wp_filter_nohtml_kses($_POST['project_link']);
+		$date = strftime("%Y-%m-%d %H:%M:%S", strtotime(wp_filter_nohtml_kses($_POST['project_date'])));
+		$type = wp_filter_nohtml_kses($_POST['project_type']);
 		
-		$query = "INSERT INTO $this->portfolio_table (id_portfolio, project_date, project_description, project_image, project_link, project_title, project_type) VALUES ('$id', '$date', '$description', '$image', '$link', '$title', '$type') ON DUPLICATE KEY UPDATE project_date = '$date', project_description = '$description', project_image = '$image', project_link = '$link', project_title = '$title', project_type = '$type'";
+		// FUTURE: Use Markdown instead
+		$id = intval($_POST['id_project']);
+		
+		$query = "INSERT INTO $this->portfolio_table 
+		(id_project, project_title, project_description, project_image, project_link, project_date, project_type) 
+		VALUES ('$id', '$title', '$description', '$image', '$link', '$date', '$type') 
+		ON DUPLICATE KEY
+		UPDATE project_title = '$title', project_description = '$description', project_image = '$image', project_link = '$link', project_date = '$date', project_type = '$type'";
 		
 		$updateEntry = mysql_query($query);
 		$result_id = mysql_insert_id();
@@ -101,13 +125,11 @@ class Portfolio
 		$query = "SELECT * FROM $this->portfolio_table";
 		$fullList = mysql_query($query);
 		
-		$page = $_GET['page']; // TODO: Sanitize this?
-		
 		?>
 	<div class="wrap">
 		<div id="icon-options-general" class="icon32"><br/></div>
 		<h2>Edit Portfolio Entries
-		<a class="button add-new-h2" href="?page=<?php echo $page; ?>&amp;entry=new">Add New</a>	
+		<a class="button add-new-h2" href="<?php echo $_SERVER['REQUEST_URI']; ?>&amp;entry=new">Add New</a>	
 		</h2>
 		
 		<?php
@@ -130,9 +152,9 @@ class Portfolio
 			$i = 0;
 			while ($entry = mysql_fetch_array($fullList)) { // TODO: Make the checkboxes do something, like delete
 				$alternate = ($i % 2 == 0) ? "alternate" : "";
-				echo "<tr id=\"" . $entry['id_portfolio'] . "\" class=\"$alternate\">";
-				echo "<th class=\"check-column\"><input type=\"checkbox\" value=\"" . $entry['id_portfolio'] . "\" name=\"post[]\"/></th>";
-				echo "<td><a class=\"row-title\" href=\"?page=$page&amp;entry=" . $entry['id_portfolio'] . "\">" . $entry['project_title'] . "</a></td>";
+				echo "<tr id=\"" . $entry['id_project'] . "\" class=\"$alternate\">";
+				echo "<th class=\"check-column\"><input type=\"checkbox\" value=\"" . $entry['id_project'] . "\" name=\"post[]\"/></th>";
+				echo "<td><a class=\"row-title\" href=\"$_SERVER[REQUEST_URI]&amp;entry=" . $entry['id_project'] . "\">" . $entry['project_title'] . "</a></td>";
 				echo "<td>" . $entry['project_type'] . "</td>";
 				echo "<td>" . strftime("%Y/%m/%d", strtotime($entry['project_date'])) . "</td>";
 				echo "</tr>";
@@ -152,20 +174,22 @@ class Portfolio
 			$buttonTitle = "Add entry";
 			$pageTitle = "Add New Portfolio Entry";
 		} else {
-			$query = "SELECT * FROM $this->portfolio_table WHERE id_portfolio = $entryID";
+			$query = "SELECT * FROM $this->portfolio_table WHERE id_project = $entryID";
 			$result = mysql_query($query);
 
 			$buttonTitle = "Save changes";
 
 			if (mysql_num_rows($result)) {
 				$already_filled = true;
-				$date = trim(mysql_result($result, 0, "project_date"));
+				
+				$id = trim(mysql_result($result, 0, "id_project"));
+				$title = trim(mysql_result($result, 0, "project_title"));
 				$description = trim(mysql_result($result, 0, "project_description"));
 				$image = trim(mysql_result($result, 0, "project_image"));
 				$link = trim(mysql_result($result, 0, "project_link"));
-				$title = trim(mysql_result($result, 0, "project_title"));
+				$date = strftime("%B %e, %Y %T", strtotime(trim(mysql_result($result, 0, "project_date")))); 
+
 				$type = trim(mysql_result($result, 0, "project_type")); // TODO: Put project types in separate table, add plugin page
-				$id = trim(mysql_result($result, 0, "id_portfolio")); // TODO: Rename to id_project, use $project throughout
 				
 				$pageTitle = "Edit $title";
 			} else {
@@ -174,13 +198,13 @@ class Portfolio
 		}
 		
 		if (!empty($errors)) {
+			$id = $_POST['id_project'];
 			$title = $_POST['project_title'];
+			$description = $_POST['project_description'];
 			$image = $_POST['project_image'];
+			$link = $_POST['project_link'];
 			$date = $_POST['project_date'];
 			$type = $_POST['project_type'];
-			$link = $_POST['project_link'];
-			$description = $_POST['project_description'];
-			$id = $_POST['id_portfolio'];
 		} 
 		
 		// TODO: Add ability to delete
@@ -199,7 +223,7 @@ class Portfolio
 			echo "<p>$message</p>";
 		}
 		?>
-		<form action="<?php echo $_SERVER ['REQUEST_URI']; ?>" method="post" accept-charset="utf-8">
+		<form action="<?php echo $_SERVER['REQUEST_URI']; ?>" method="post" accept-charset="utf-8">
 			<table class="form-table">
 				<tr valign="top">
 					<th scope="row">Project Title</th>
@@ -228,7 +252,7 @@ class Portfolio
 				<tr valign="top">
 					<th scope="row">&nbsp;</th>
 					<td>
-						<input type="hidden" name="id_portfolio" value="<?php echo $id; ?>" />
+						<input type="hidden" name="id_project" value="<?php echo $id; ?>" />
 						<input type="hidden" name="submit_check" value="1" />
 						<input class="button-primary" type="submit" value="<?php echo $buttonTitle; ?>" />
 						<?php

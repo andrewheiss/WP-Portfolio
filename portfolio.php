@@ -148,14 +148,15 @@ class Portfolio
 	{
 		$title = wp_filter_nohtml_kses($_POST['type_title']);
 		$description = wp_filter_kses($_POST['type_description']); // FIXME: This strips out <p>s, but shouldn't
+		$order = intval($_POST['type_order']);
 		
 		$id = intval($_POST['id_type']);
 		
 		$query = "INSERT INTO $this->portfolio_types_table
-		(id_type, type_title, type_description)
-		VALUES ('$id', '$title', '$description')
+		(id_type, type_title, type_description, type_order)
+		VALUES ('$id', '$title', '$description', '$order')
 		ON DUPLICATE KEY
-		UPDATE type_title = '$title', type_description = '$description'";
+		UPDATE type_title = '$title', type_description = '$description', type_order = '$order'";
 		
 		$updateType = mysql_query($query);
 		$result_id = mysql_insert_id();
@@ -224,7 +225,7 @@ class Portfolio
 		$query = "SELECT a.*, COUNT(v.id_project) AS projectCount
 		 FROM $this->portfolio_types_table AS a
 		 LEFT JOIN $this->portfolio_table AS v ON ( v.fk_type = a.id_type )
-		 GROUP BY a.id_type";
+		 GROUP BY a.id_type ORDER BY a.type_order DESC, a.type_title ASC";
 		$fullList = mysql_query($query);
 	?>
 		<div class="wrap">
@@ -279,7 +280,7 @@ class Portfolio
 	
 
 	function showList($message = "") {
-		$query = "SELECT * FROM $this->portfolio_table LEFT JOIN $this->portfolio_types_table ON $this->portfolio_types_table.id_type = $this->portfolio_table.fk_type";
+		$query = "SELECT * FROM $this->portfolio_table LEFT JOIN $this->portfolio_types_table ON $this->portfolio_types_table.id_type = $this->portfolio_table.fk_type ORDER BY project_date DESC";
 		$fullList = mysql_query($query);
 	?>
 	<div class="wrap">
@@ -339,8 +340,6 @@ class Portfolio
 
 	function editIndividualType($typeID = 0, $errors = "", $message = "") {
 		$already_filled = false;
-		// TODO: Add order column for types
-		// TODO: Order of type and entry lists
 		if ($typeID == 0) {
 			# Add a new entry
 			$buttonTitle = "Add type";
@@ -357,6 +356,7 @@ class Portfolio
 				$id = trim(mysql_result($result, 0, "id_type"));
 				$title = trim(mysql_result($result, 0, "type_title"));
 				$description = trim(mysql_result($result, 0, "type_description"));
+				$order = trim(mysql_result($result, 0, "type_order"));
 				
 				$pageTitle = "Edit $title";
 			} else {
@@ -368,6 +368,7 @@ class Portfolio
 			$id = $_POST['id_type'];
 			$title = $_POST['type_title'];
 			$description = $_POST['type_description'];
+			$order = $_POST['type_order'];
 		} ?>
 	<div class="wrap">
 		<div id="icon-options-general" class="icon32"><br/></div>
@@ -406,6 +407,10 @@ class Portfolio
 							}
 						?>
 					</td>
+				</tr>
+				<tr valign="top">
+					<th scope="row">Order</th>
+					<td><input type="text" name="type_order" value="<?php echo $order; ?>" /></td>
 				</tr>
 			</table>
 			<p></p>

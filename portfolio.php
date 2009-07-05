@@ -16,13 +16,14 @@ add_action( 'admin_menu', array(&$portfolio, 'addAdminMenu') );
 
 /**
 * WP Portfolio
+* TODO: Make messages look nicer
+* TODO: Front end
+* TODO: Use a lightbox/thick box to display portfolio entries
 */
 class Portfolio
 {
 	var $portfolio_table;
 	var $portfolio_type_table;
-	// TODO: Include functions to display the portfolio
-	// TODO: Use a lightbox/thick box to display portfolio entries
 	
 	function __construct()
 	{

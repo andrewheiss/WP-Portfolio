@@ -20,13 +20,17 @@ add_action( 'admin_menu', array(&$portfolio, 'addAdminMenu') );
 class Portfolio
 {
 	var $portfolio_table;
+	var $portfolio_type_table;
 	// TODO: Include functions to display the portfolio
 	// TODO: Use a lightbox/thick box to display portfolio entries
 	
 	function __construct()
 	{
 		add_option("portfolio_table", "ah_portfolio");
+		add_option("portfolio_types_table", "ah_portfolio_types");
 		$this->portfolio_table = get_option('portfolio_table');
+		$this->portfolio_types_table = get_option('portfolio_types_table');
+		
 		// if (!function_exists("Markdown")) {
 		// 	require (dirname(__FILE__).'/lib/markdown.php');
 		// }
@@ -44,7 +48,7 @@ class Portfolio
 		add_menu_page('Portfolio Settings', 'Portfolio', 8, __FILE__, array(&$this, 'portfolioOptions'));
 		add_submenu_page(__FILE__, 'Portfolio settings', 'Settings', 8, __FILE__, array(&$this, 'portfolioOptions'));
 		add_submenu_page(__FILE__, 'Manage Portfolio Entries', 'Edit Portfolio Entries', 8, 'portfolio-edit', array(&$this, 'manageEntries'));
-		add_submenu_page(__FILE__, 'Manage Project Types', 'Manage Project Types', 8, 'portfolio-types-edit', array(&$this, 'editTypes'));	
+		add_submenu_page(__FILE__, 'Manage Project Types', 'Manage Project Types', 8, 'portfolio-types-edit', array(&$this, 'manageTypes'));	
 	}
 	
 	function portfolioOptions() {
@@ -56,11 +60,41 @@ class Portfolio
 		echo '</div>';
 	}
 	
+	// FUTURE: Simplify manageTypes() and manageEntries() - too much repetition--could be put in one method
+	
+	function manageTypes() {
+		// Delete types in bulk
+		if ($_POST['action'] == 'delete' && count($_POST['type_check']) > 0) {
+			if ($this->deleteItems('type')) {
+				$this->showListTypes("Portfolio types successfully deleted");
+				return;
+			}
+		}
+
+		// If an individual type is specified, edit it (and/or validate and process it)
+		// Otherwise, just show the full list of types
+		if (empty($_GET['type'])) {
+			$this->showListTypes();
+		} else {
+			$typeID = intval($_GET['type']);
+			
+			if (isset($_POST['submit_check'])) { // If the form was submitted...
+				 if ($form_errors = $this->validateType()) {
+					 $this->editIndividualType($typeID, $form_errors);
+				 } else {
+					 $this->processTypes();
+				 }
+			} else {
+				$this->editIndividualType($typeID); // If not, just edit the type
+			}
+		}
+	}
+	
 	function manageEntries() {
 
-		// Delete posts in bulk
+		// Delete entries in bulk
 		if ($_POST['action'] == 'delete' && count($_POST['entry_check']) > 0) {
-			if ($this->deleteEntries()) {
+			if ($this->deleteItems('entry')) {
 				$this->showList("Portfolio entries successfully deleted");
 				return;
 			}
@@ -86,9 +120,19 @@ class Portfolio
 		
 	}
 	
-	function deleteEntries() {
-		$entries = implode(",", $_POST['entry_check']); 
-		$query = "DELETE FROM $this->portfolio_table WHERE id_project IN ($entries)";
+	function deleteItems($type) {
+		if ($type == "entry") {
+			$items = implode(",", $_POST['entry_check']); 
+			$table = $this->portfolio_table;
+			$column = "id_project";
+		} elseif ($type == "type") {
+			$items = implode(",", $_POST['type_check']); 
+			$table = $this->portfolio_types_table;
+			$column = "id_type";
+		}
+		
+		$query = "DELETE FROM $table WHERE $column IN ($items)";
+		
 		$result = mysql_query($query);
 		if ($result) {
 			return true;
@@ -97,6 +141,34 @@ class Portfolio
 	
 	function editTypes() {
 		echo "Here's where you can manage the types of projects";
+	}
+	
+	function processTypes()
+	{
+		$title = wp_filter_nohtml_kses($_POST['type_title']);;
+		$name = wp_filter_nohtml_kses($_POST['type_name']);;
+		$description = wp_filter_kses($_POST['type_description']); // FIXME: This strips out <p>s, but shouldn't
+		
+		$id = intval($_POST['id_type']);
+		
+		$query = "INSERT INTO $this->portfolio_types_table
+		(id_type, type_title, type_name, type_description)
+		VALUES ('$id', '$title', '$name', '$description')
+		ON DUPLICATE KEY
+		UPDATE type_title = '$title', type_name = '$name', type_description = '$description'";
+		
+		$updateType = mysql_query($query);
+		$result_id = mysql_insert_id();
+		
+		$title = stripslashes($title);
+		
+		if ($result_id == $id) {
+			$message = "$title successfully updated";
+			$this->editIndividualType($id, "", $message);
+		} else {
+			$message = "$title successfully added";
+			$this->showListTypes($message);
+		}
 	}
 	
 	function processForm() {
@@ -137,13 +209,75 @@ class Portfolio
 		
 		return $errors;
 	}
+	
+	function validateType() {
+		if (empty($_POST['type_title'])) {
+			$errors[] = "Please type a type title.";
+		}
+		
+		return $errors;
+	}
+	
+	
+	function showListTypes($message = "") {
+		$query = "SELECT * FROM $this->portfolio_types_table";
+		$fullList = mysql_query($query);
+	?>
+		<div class="wrap">
+			<div id="icon-options-general" class="icon32"><br/></div>
+			<h2>Edit Project Types
+			<a class="button add-new-h2" href="<?php echo $_SERVER['REQUEST_URI']; ?>&amp;type=new">Add New</a>	
+			</h2>
+
+			<?php
+				if (!empty($message)) {
+					echo "<p>$message</p>";
+				}
+			?>
+			<form id="posts-filter" method="post" action="<?php echo $_SERVER['REQUEST_URI']; ?>">
+			<div class="tablenav">
+				<div class="alignleft actions">
+					<select name="action">
+						<option selected="selected" value="-1">Bulk Actions</option>
+						<option value="delete">Delete</option>
+					</select>
+					<input id="doaction" class="button-secondary action" type="submit" name="doaction" value="Apply"/>
+				</div>
+				<br class="clear"/>
+			</div>
+
+			<table class="widefat" cellspacing="0">
+				<thead>
+					<tr>
+						<th id="cb" class="manage-column column-cb check-column"><input type="checkbox"/></th>
+						<th class="manage-column column-title">Title</th>
+						<th class="manage-column">Name</th>
+					</tr>
+				</thead>
+				<tbody>	
+			<?php
+				$i = 0;
+				while ($entry = mysql_fetch_array($fullList)) { 
+					$alternate = ($i % 2 == 0) ? "alternate" : "";
+					echo "<tr id=\"" . $entry['id_type'] . "\" class=\"$alternate\">";
+					echo "<th class=\"check-column\"><input type=\"checkbox\" value=\"" . $entry['id_type'] . "\" name=\"type_check[]\"/></th>";
+					echo "<td><a class=\"row-title\" href=\"$_SERVER[REQUEST_URI]&amp;type=" . $entry['id_type'] . "\">" . $entry['type_title'] . "</a></td>";
+					echo "<td>" . $entry['type_name'] . "</td>";
+					echo "</tr>";
+					$i++;
+				}?>
+				</tbody>
+			</table>
+			</form>
+		<?php
+	}
+	
 
 	function showList($message = "") {
 		$query = "SELECT * FROM $this->portfolio_table";
 		$fullList = mysql_query($query);
 		// TODO: Add published flag so entries can be archived
-		
-		?>
+	?>
 	<div class="wrap">
 		<div id="icon-options-general" class="icon32"><br/></div>
 		<h2>Edit Portfolio Entries
@@ -195,6 +329,86 @@ class Portfolio
 	<?php
 	} // End of editEntries()
 
+
+	function editIndividualType($typeID = 0, $errors = "", $message = "") {
+		$already_filled = false;
+		
+		if ($typeID == 0) {
+			# Add a new entry
+			$buttonTitle = "Add type";
+			$pageTitle = "Add New Project Type";
+		} else {
+			$query = "SELECT * FROM $this->portfolio_types_table WHERE id_type = $typeID";
+			$result = mysql_query($query);
+
+			$buttonTitle = "Save changes";
+
+			if (mysql_num_rows($result)) {
+				$already_filled = true;
+				
+				$id = trim(mysql_result($result, 0, "id_type"));
+				$name = trim(mysql_result($result, 0, "type_name"));
+				$title = trim(mysql_result($result, 0, "type_title"));
+				$description = trim(mysql_result($result, 0, "type_description"));
+				
+				$pageTitle = "Edit $title";
+			} else {
+				$this->showListTypes(); // Invalid entry ID
+			}
+		}
+		
+		if (!empty($errors)) {
+			$id = $_POST['id_type'];
+			$name = $_POST['type_name'];
+			$title = $_POST['type_title'];
+			$description = $_POST['type_description'];
+		} ?>
+	<div class="wrap">
+		<div id="icon-options-general" class="icon32"><br/></div>
+		<h2><?php echo $pageTitle; ?></h2>
+		<p>Here's where I can edit the portfolio entry types.</p>
+		<?php
+		if (!empty($errors)) {
+			foreach ($errors as $value) {
+				echo "<p>".$value."</p>";
+			}
+		}
+		if (!empty($message)) {
+			echo "<p>$message</p>";
+		}
+		?>
+		<form action="<?php echo $_SERVER['REQUEST_URI']; ?>" method="post" accept-charset="utf-8">
+			<table class="form-table">
+				<tr valign="top">
+					<th scope="row">Type Title</th>
+					<td><input type="text" name="type_title" value="<?php echo $title; ?>" /></td>
+				</tr>
+				<tr valign="top">
+					<th scope="row">Type Name</th>
+					<td><input type="text" name="type_name" value="<?php echo $name; ?>" /></td>
+				</tr>
+				<tr valign="top">
+					<th scope="row">Project Description</th>
+					<td><textarea name="type_description" rows="8" cols="40"><?php echo $description; ?></textarea></td>
+				</tr>
+				<tr valign="top">
+					<th scope="row">&nbsp;</th>
+					<td>
+						<input type="hidden" name="id_type" value="<?php echo $id; ?>" />
+						<input type="hidden" name="submit_check" value="1" />
+						<input class="button-primary" type="submit" value="<?php echo $buttonTitle; ?>" />
+						<?php
+							if ($already_filled == true) {
+								?><input class="button" type="submit" name="delete_type" value="Delete" /><?php // TODO: Make single deleting work too
+							}
+						?>
+					</td>
+				</tr>
+			</table>
+			<p></p>
+		</form>
+	</div>
+<?php	}
 
 	function editIndividual($entryID = 0, $errors = "", $message = "") {
 		$already_filled = false;

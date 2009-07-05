@@ -145,17 +145,16 @@ class Portfolio
 	
 	function processTypes()
 	{
-		$title = wp_filter_nohtml_kses($_POST['type_title']);;
-		$name = wp_filter_nohtml_kses($_POST['type_name']);;
+		$title = wp_filter_nohtml_kses($_POST['type_title']);
 		$description = wp_filter_kses($_POST['type_description']); // FIXME: This strips out <p>s, but shouldn't
 		
 		$id = intval($_POST['id_type']);
 		
 		$query = "INSERT INTO $this->portfolio_types_table
-		(id_type, type_title, type_name, type_description)
-		VALUES ('$id', '$title', '$name', '$description')
+		(id_type, type_title, type_description)
+		VALUES ('$id', '$title', '$description')
 		ON DUPLICATE KEY
-		UPDATE type_title = '$title', type_name = '$name', type_description = '$description'";
+		UPDATE type_title = '$title', type_description = '$description'";
 		
 		$updateType = mysql_query($query);
 		$result_id = mysql_insert_id();
@@ -178,15 +177,16 @@ class Portfolio
 		$link = wp_filter_nohtml_kses($_POST['project_link']);
 		$date = strftime("%Y-%m-%d %H:%M:%S", strtotime(wp_filter_nohtml_kses($_POST['project_date'])));
 		$type = wp_filter_nohtml_kses($_POST['project_type']);
+		$visible = (isset($_POST['project_visible'])) ? "1" : "0" ;
 		
 		// FUTURE: Use Markdown instead
 		$id = intval($_POST['id_project']);
 		
 		$query = "INSERT INTO $this->portfolio_table 
-		(id_project, fk_type, project_title, project_description, project_image, project_link, project_date) 
-		VALUES ('$id', '$type', '$title', '$description', '$image', '$link', '$date') 
+		(id_project, fk_type, project_title, project_description, project_image, project_link, project_date, project_visible) 
+		VALUES ('$id', '$type', '$title', '$description', '$image', '$link', '$date', '$visible') 
 		ON DUPLICATE KEY
-		UPDATE fk_type = '$type', project_title = '$title', project_description = '$description', project_image = '$image', project_link = '$link', project_date = '$date'";
+		UPDATE fk_type = '$type', project_title = '$title', project_description = '$description', project_image = '$image', project_link = '$link', project_date = '$date', project_visible = '$visible'";
 		
 		$updateEntry = mysql_query($query);
 		$result_id = mysql_insert_id();
@@ -219,8 +219,11 @@ class Portfolio
 	}
 	
 	
-	function showListTypes($message = "") {
-		$query = "SELECT * FROM $this->portfolio_types_table";
+	function showListTypes($message = "") {		
+		$query = "SELECT a.*, COUNT(v.id_project) AS projectCount
+		 FROM $this->portfolio_types_table AS a
+		 LEFT JOIN $this->portfolio_table AS v ON ( v.fk_type = a.id_type )
+		 GROUP BY a.id_type";
 		$fullList = mysql_query($query);
 	?>
 		<div class="wrap">
@@ -251,7 +254,7 @@ class Portfolio
 					<tr>
 						<th id="cb" class="manage-column column-cb check-column"><input type="checkbox"/></th>
 						<th class="manage-column column-title">Title</th>
-						<th class="manage-column">Name</th>
+						<th class="manage-column">Number of portfolio entries</th>
 					</tr>
 				</thead>
 				<tbody>	
@@ -262,7 +265,8 @@ class Portfolio
 					echo "<tr id=\"" . $entry['id_type'] . "\" class=\"$alternate\">";
 					echo "<th class=\"check-column\"><input type=\"checkbox\" value=\"" . $entry['id_type'] . "\" name=\"type_check[]\"/></th>";
 					echo "<td><a class=\"row-title\" href=\"$_SERVER[REQUEST_URI]&amp;type=" . $entry['id_type'] . "\">" . $entry['type_title'] . "</a></td>";
-					echo "<td>" . $entry['type_name'] . "</td>";
+					
+					echo "<td class=\"manage-column\">" . $entry['projectCount'] . "</td>";
 					echo "</tr>";
 					$i++;
 				}?>
@@ -276,7 +280,6 @@ class Portfolio
 	function showList($message = "") {
 		$query = "SELECT * FROM $this->portfolio_table LEFT JOIN $this->portfolio_types_table ON $this->portfolio_types_table.id_type = $this->portfolio_table.fk_type";
 		$fullList = mysql_query($query);
-		// TODO: Add published flag so entries can be archived
 	?>
 	<div class="wrap">
 		<div id="icon-options-general" class="icon32"><br/></div>
@@ -307,6 +310,7 @@ class Portfolio
 					<th id="cb" class="manage-column column-cb check-column"><input type="checkbox"/></th>
 					<th class="manage-column column-title">Title</th>
 					<th class="manage-column">Type</th>
+					<th class="manage-column">Visible</th>
 					<th class="manage-column column-date">Date</th>
 				</tr>
 			</thead>
@@ -319,6 +323,8 @@ class Portfolio
 				echo "<th class=\"check-column\"><input type=\"checkbox\" value=\"" . $entry['id_project'] . "\" name=\"entry_check[]\"/></th>";
 				echo "<td><a class=\"row-title\" href=\"$_SERVER[REQUEST_URI]&amp;entry=" . $entry['id_project'] . "\">" . $entry['project_title'] . "</a></td>";
 				echo "<td>" . $entry['type_title'] . "</td>";
+				$visible = ($entry['project_visible'] == 1) ? "Yes" : "No";
+				echo "<td>$visible</td>";
 				echo "<td>" . strftime("%Y/%m/%d", strtotime($entry['project_date'])) . "</td>";
 				echo "</tr>";
 				$i++;
@@ -347,7 +353,6 @@ class Portfolio
 				$already_filled = true;
 				
 				$id = trim(mysql_result($result, 0, "id_type"));
-				$name = trim(mysql_result($result, 0, "type_name"));
 				$title = trim(mysql_result($result, 0, "type_title"));
 				$description = trim(mysql_result($result, 0, "type_description"));
 				
@@ -359,7 +364,6 @@ class Portfolio
 		
 		if (!empty($errors)) {
 			$id = $_POST['id_type'];
-			$name = $_POST['type_name'];
 			$title = $_POST['type_title'];
 			$description = $_POST['type_description'];
 		} ?>
@@ -382,10 +386,6 @@ class Portfolio
 				<tr valign="top">
 					<th scope="row">Type Title</th>
 					<td><input type="text" name="type_title" value="<?php echo $title; ?>" /></td>
-				</tr>
-				<tr valign="top">
-					<th scope="row">Type Name</th>
-					<td><input type="text" name="type_name" value="<?php echo $name; ?>" /></td>
 				</tr>
 				<tr valign="top">
 					<th scope="row">Project Description</th>
@@ -435,7 +435,8 @@ class Portfolio
 				$description = trim(mysql_result($result, 0, "project_description"));
 				$image = trim(mysql_result($result, 0, "project_image"));
 				$link = trim(mysql_result($result, 0, "project_link"));
-				$date = strftime("%B %e, %Y %T", strtotime(trim(mysql_result($result, 0, "project_date")))); 
+				$date = strftime("%B %e, %Y %T", strtotime(trim(mysql_result($result, 0, "project_date"))));
+				$visible = trim(mysql_result($result, 0, "project_visible")); 
 				$type = trim(mysql_result($result, 0, "fk_type")); 
 				
 				$pageTitle = "Edit $title";
@@ -451,6 +452,7 @@ class Portfolio
 			$image = $_POST['project_image'];
 			$link = $_POST['project_link'];
 			$date = $_POST['project_date'];
+			$visible = $_POST['project_visible'];
 			$type = $_POST['project_type'];
 		} 
 	?>
@@ -483,6 +485,11 @@ class Portfolio
 							echo "<option $selected value=\"$getType[id_type]\">$getType[type_title]</option>";
 						}?>	
 					</select></td>
+				</tr>
+				<tr valign="top">
+					<th scope="row">Visible on front page?</th>
+					<?php $checked = ($visible == 1) ? " checked=\"checked\"": ""; ?>
+					<td><input <?php echo $checked; ?>type="checkbox" name="project_visible" value="visible" /></td>
 				</tr>
 				<tr valign="top">
 					<th scope="row">Project URL</th>

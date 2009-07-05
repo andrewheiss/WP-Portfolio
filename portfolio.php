@@ -41,10 +41,9 @@ class Portfolio
 	}
 	
 	function addAdminMenu() {
-		
 		add_menu_page('Portfolio Settings', 'Portfolio', 8, __FILE__, array(&$this, 'portfolioOptions'));
 		add_submenu_page(__FILE__, 'Portfolio settings', 'Settings', 8, __FILE__, array(&$this, 'portfolioOptions'));
-		add_submenu_page(__FILE__, 'Manage Portfolio Entries', 'Edit Portfolio Entries', 8, 'portfolio-edit', array(&$this, 'editEntries'));
+		add_submenu_page(__FILE__, 'Manage Portfolio Entries', 'Edit Portfolio Entries', 8, 'portfolio-edit', array(&$this, 'manageEntries'));
 		add_submenu_page(__FILE__, 'Manage Project Types', 'Manage Project Types', 8, 'portfolio-types-edit', array(&$this, 'editTypes'));	
 	}
 	
@@ -57,8 +56,18 @@ class Portfolio
 		echo '</div>';
 	}
 	
-	function editEntries() {
+	function manageEntries() {
 
+		// Delete posts in bulk
+		if ($_POST['action'] == 'delete' && count($_POST['entry_check']) > 0) {
+			if ($this->deleteEntries()) {
+				$this->showList("Portfolio entries successfully deleted");
+				return;
+			}
+		}
+
+		// If an individual entry is specified, edit it (and/or validate and process it)
+		// Otherwise, just show the full list
 		if (empty($_GET['entry'])) {
 			$this->showList();
 		} else {
@@ -74,10 +83,19 @@ class Portfolio
 				$this->editIndividual($itemID); // If not, just edit the entry
 			}
 		}
+		
 	}
 	
-	function editTypes()
-	{
+	function deleteEntries() {
+		$entries = implode(",", $_POST['entry_check']); 
+		$query = "DELETE FROM $this->portfolio_table WHERE id_project IN ($entries)";
+		$result = mysql_query($query);
+		if ($result) {
+			return true;
+		}
+	}
+	
+	function editTypes() {
 		echo "Here's where you can manage the types of projects";
 	}
 	
@@ -121,9 +139,9 @@ class Portfolio
 	}
 
 	function showList($message = "") {
-
 		$query = "SELECT * FROM $this->portfolio_table";
 		$fullList = mysql_query($query);
+		// TODO: Add published flag so entries can be archived
 		
 		?>
 	<div class="wrap">
@@ -137,11 +155,22 @@ class Portfolio
 				echo "<p>$message</p>";
 			}
 		?>
+		<form id="posts-filter" method="post" action="<?php echo $_SERVER['REQUEST_URI']; ?>">
+		<div class="tablenav">
+			<div class="alignleft actions">
+				<select name="action">
+					<option selected="selected" value="-1">Bulk Actions</option>
+					<option value="delete">Delete</option>
+				</select>
+				<input id="doaction" class="button-secondary action" type="submit" name="doaction" value="Apply"/>
+			</div>
+			<br class="clear"/>
+		</div>
 		
 		<table class="widefat" cellspacing="0">
 			<thead>
 				<tr>
-					<th class="manage-column column-cb check-column">&nbsp;</th>
+					<th id="cb" class="manage-column column-cb check-column"><input type="checkbox"/></th>
 					<th class="manage-column column-title">Title</th>
 					<th class="manage-column">Type</th>
 					<th class="manage-column column-date">Date</th>
@@ -150,10 +179,10 @@ class Portfolio
 			<tbody>	
 		<?php
 			$i = 0;
-			while ($entry = mysql_fetch_array($fullList)) { // TODO: Make the checkboxes do something, like delete
+			while ($entry = mysql_fetch_array($fullList)) { 
 				$alternate = ($i % 2 == 0) ? "alternate" : "";
 				echo "<tr id=\"" . $entry['id_project'] . "\" class=\"$alternate\">";
-				echo "<th class=\"check-column\"><input type=\"checkbox\" value=\"" . $entry['id_project'] . "\" name=\"post[]\"/></th>";
+				echo "<th class=\"check-column\"><input type=\"checkbox\" value=\"" . $entry['id_project'] . "\" name=\"entry_check[]\"/></th>";
 				echo "<td><a class=\"row-title\" href=\"$_SERVER[REQUEST_URI]&amp;entry=" . $entry['id_project'] . "\">" . $entry['project_title'] . "</a></td>";
 				echo "<td>" . $entry['project_type'] . "</td>";
 				echo "<td>" . strftime("%Y/%m/%d", strtotime($entry['project_date'])) . "</td>";
@@ -162,6 +191,7 @@ class Portfolio
 			}?>
 			</tbody>
 		</table>
+		</form>
 	<?php
 	} // End of editEntries()
 
@@ -206,8 +236,6 @@ class Portfolio
 			$date = $_POST['project_date'];
 			$type = $_POST['project_type'];
 		} 
-		
-		// TODO: Add ability to delete
 	?>
 	<div class="wrap">
 		<div id="icon-options-general" class="icon32"><br/></div>

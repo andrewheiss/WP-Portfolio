@@ -9,10 +9,10 @@ Author URI: http://www.andrewheiss.com/
 */
 
 // error_reporting(E_ALL);
-$portfolio = new Portfolio();
-add_action( 'admin_menu', array(&$portfolio, 'addAdminMenu') );
-// require('lib/markdown.php');
-// require('lib/smartypants.php');
+$portfolioAdmin = new PortfolioAdmin();
+$portfolioDisplay = new PortfolioDisplay();
+add_action('admin_menu', array(&$portfolioAdmin, 'addAdminMenu'));
+add_filter('the_content', array(&$portfolioDisplay, 'insertPortfolio'));
 
 /**
 * WP Portfolio
@@ -20,10 +20,10 @@ add_action( 'admin_menu', array(&$portfolio, 'addAdminMenu') );
 * TODO: Front end
 * TODO: Use a lightbox/thick box to display portfolio entries
 */
-class Portfolio
-{
+class PortfolioAdmin {
 	var $portfolio_table;
-	var $portfolio_type_table;
+	var $portfolio_types_table;
+	var $inherit_test;
 	
 	function __construct()
 	{
@@ -31,13 +31,7 @@ class Portfolio
 		add_option("portfolio_types_table", "ah_portfolio_types");
 		$this->portfolio_table = get_option('portfolio_table');
 		$this->portfolio_types_table = get_option('portfolio_types_table');
-		
-		// if (!function_exists("Markdown")) {
-		// 	require (dirname(__FILE__).'/lib/markdown.php');
-		// }
-		// if (!function_exists("SmartyPants")) {
-		// 	require (dirname(__FILE__).'/lib/smartypants.php');
-		// }
+		$this->inherit_test = "This is a test. This is only a test";
 	}
 	
 	function niceHTML($text) {
@@ -395,6 +389,10 @@ class Portfolio
 					<td><textarea name="type_description" rows="8" cols="40"><?php echo $description; ?></textarea></td>
 				</tr>
 				<tr valign="top">
+					<th scope="row">Order (optional)</th>
+					<td><input type="text" name="type_order" value="<?php echo $order; ?>" /></td>
+				</tr>
+				<tr valign="top">
 					<th scope="row">&nbsp;</th>
 					<td>
 						<input type="hidden" name="id_type" value="<?php echo $id; ?>" />
@@ -407,10 +405,6 @@ class Portfolio
 							}
 						?>
 					</td>
-				</tr>
-				<tr valign="top">
-					<th scope="row">Order</th>
-					<td><input type="text" name="type_order" value="<?php echo $order; ?>" /></td>
 				</tr>
 			</table>
 			<p></p>
@@ -535,4 +529,72 @@ class Portfolio
 	<?php
 	}
 	
-}
+} // End of PortfolioAdmin{}
+
+
+/**
+* Portfolio Display
+*/
+class PortfolioDisplay extends PortfolioAdmin
+{
+	
+	function __construct() {
+		parent::__construct(); // Get the __construct variables from PortfolioAdmin{}
+		
+	}
+	
+	function insertPortfolio($content) {
+		if (preg_match('{PORTFOLIO}', $content)) {
+			$content = str_replace('{PORTFOLIO}', $this->buildPortfolio(), $content);
+		}
+	}
+	
+	function buildPortfolio() {
+		$query = "SELECT * FROM $this->portfolio_types_table ORDER BY type_order DESC, type_title ASC";
+		$results = mysql_query($query);
+		
+		while ($type = mysql_fetch_array($results)) {
+			$this->buildTypeHead($type['type_title'], $type['type_description'], $type['id_type']);
+		}
+		
+	}
+	
+	function buildTypeHead($title, $description, $id)
+	{
+		echo "<h3>$title</h3>";
+		echo "<p>$description</p>";
+		
+		$query1 = "SELECT * FROM $this->portfolio_table WHERE fk_type = $id";
+		$getresults = mysql_query($query1);
+		
+		echo "<div class=\"portfolio-section web\">\n";
+		
+		$i = 0;
+
+		while ($item = mysql_fetch_array($getresults)) {
+			$i++;
+			echo "<div class=\"portfolio-item\">\n";
+			echo "<a href=\"#TB_inline?height=155&width=300&inlineId=projectDetails_$item[id_project]\" class=\"thickbox\" title=\"$item[project_title]\" ><img src=\"$item[project_image]\" alt=\"$item[project_title]\" /></a>\n";
+			echo "<h4><a href=\"$item[project_link]\" title=\"$item[project_title]\" class=\"external\">$item[project_title]</a></h4>\n";
+			
+			echo "<div id=\"projectDetails_$item[id_project]\" class=\"modal-hidden-content\">"; 
+			echo "<p>$item[project_description]</p>";
+			echo "</div>";
+			
+			echo "</div>\n";
+			if ($i % 3 == 0) {
+				// echo "<br class=\"clearfloat\" />\n";
+			}
+		}
+
+		
+		echo "</div>";
+		echo "<br class=\"clearfloat\" />\n";
+		
+		
+	}
+	
+} // End of PortfolioDisplay{}
+
+
+

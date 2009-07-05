@@ -339,7 +339,8 @@ class Portfolio
 
 	function editIndividualType($typeID = 0, $errors = "", $message = "") {
 		$already_filled = false;
-		
+		// TODO: Add order column for types
+		// TODO: Order of type and entry lists
 		if ($typeID == 0) {
 			# Add a new entry
 			$buttonTitle = "Add type";

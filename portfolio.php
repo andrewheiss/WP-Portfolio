@@ -183,10 +183,10 @@ class Portfolio
 		$id = intval($_POST['id_project']);
 		
 		$query = "INSERT INTO $this->portfolio_table 
-		(id_project, project_title, project_description, project_image, project_link, project_date, project_type) 
-		VALUES ('$id', '$title', '$description', '$image', '$link', '$date', '$type') 
+		(id_project, fk_type, project_title, project_description, project_image, project_link, project_date) 
+		VALUES ('$id', '$type', '$title', '$description', '$image', '$link', '$date') 
 		ON DUPLICATE KEY
-		UPDATE project_title = '$title', project_description = '$description', project_image = '$image', project_link = '$link', project_date = '$date', project_type = '$type'";
+		UPDATE fk_type = '$type', project_title = '$title', project_description = '$description', project_image = '$image', project_link = '$link', project_date = '$date'";
 		
 		$updateEntry = mysql_query($query);
 		$result_id = mysql_insert_id();
@@ -274,7 +274,7 @@ class Portfolio
 	
 
 	function showList($message = "") {
-		$query = "SELECT * FROM $this->portfolio_table";
+		$query = "SELECT * FROM $this->portfolio_table LEFT JOIN $this->portfolio_types_table ON $this->portfolio_types_table.id_type = $this->portfolio_table.fk_type";
 		$fullList = mysql_query($query);
 		// TODO: Add published flag so entries can be archived
 	?>
@@ -318,7 +318,7 @@ class Portfolio
 				echo "<tr id=\"" . $entry['id_project'] . "\" class=\"$alternate\">";
 				echo "<th class=\"check-column\"><input type=\"checkbox\" value=\"" . $entry['id_project'] . "\" name=\"entry_check[]\"/></th>";
 				echo "<td><a class=\"row-title\" href=\"$_SERVER[REQUEST_URI]&amp;entry=" . $entry['id_project'] . "\">" . $entry['project_title'] . "</a></td>";
-				echo "<td>" . $entry['project_type'] . "</td>";
+				echo "<td>" . $entry['type_title'] . "</td>";
 				echo "<td>" . strftime("%Y/%m/%d", strtotime($entry['project_date'])) . "</td>";
 				echo "</tr>";
 				$i++;
@@ -397,6 +397,7 @@ class Portfolio
 						<input type="hidden" name="id_type" value="<?php echo $id; ?>" />
 						<input type="hidden" name="submit_check" value="1" />
 						<input class="button-primary" type="submit" value="<?php echo $buttonTitle; ?>" />
+						<a class="button" href="<?php echo preg_replace("/&type=(\d+|new)/", "", $_SERVER['REQUEST_URI']); ?>">Cancel</a>
 						<?php
 							if ($already_filled == true) {
 								?><input class="button" type="submit" name="delete_type" value="Delete" /><?php // TODO: Make single deleting work too
@@ -412,6 +413,9 @@ class Portfolio
 
 	function editIndividual($entryID = 0, $errors = "", $message = "") {
 		$already_filled = false;
+		
+		$types = "SELECT * FROM $this->portfolio_types_table";
+		$getTypes = mysql_query($types);
 		
 		if ($entryID == 0) {
 			# Add a new entry
@@ -432,8 +436,7 @@ class Portfolio
 				$image = trim(mysql_result($result, 0, "project_image"));
 				$link = trim(mysql_result($result, 0, "project_link"));
 				$date = strftime("%B %e, %Y %T", strtotime(trim(mysql_result($result, 0, "project_date")))); 
-
-				$type = trim(mysql_result($result, 0, "project_type")); // TODO: Put project types in separate table, add plugin page
+				$type = trim(mysql_result($result, 0, "fk_type")); 
 				
 				$pageTitle = "Edit $title";
 			} else {
@@ -473,7 +476,13 @@ class Portfolio
 				</tr>
 				<tr valign="top">
 					<th scope="row">Project Type</th>
-					<td><input type="text" name="project_type" value="<?php echo $type; ?>" /></td>
+					<td><select name="project_type" id="project_type">
+						<option></option>
+						<?php while ($getType = mysql_fetch_array($getTypes)) {
+							$selected = ($type == $getType['id_type']) ? "selected=\"selected\"" : "";
+							echo "<option $selected value=\"$getType[id_type]\">$getType[type_title]</option>";
+						}?>	
+					</select></td>
 				</tr>
 				<tr valign="top">
 					<th scope="row">Project URL</th>
@@ -497,6 +506,7 @@ class Portfolio
 						<input type="hidden" name="id_project" value="<?php echo $id; ?>" />
 						<input type="hidden" name="submit_check" value="1" />
 						<input class="button-primary" type="submit" value="<?php echo $buttonTitle; ?>" />
+						<a class="button" href="<?php echo preg_replace("/&entry=(\d+|new)/", "", $_SERVER['REQUEST_URI']); ?>">Cancel</a>
 						<?php
 							if ($already_filled == true) {
 								?><input class="button" type="submit" name="delete_entry" value="Delete" /><?php

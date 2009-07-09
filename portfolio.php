@@ -618,21 +618,23 @@ class Item {
 	}
 	
 	private function displayDetails() {
-		$thickbox_link = "#TB_inline?width=630&height=500&inlineId=projectDetails_".$this->id;
-		echo "<div class=\"portfolio-item\">\n";
-		echo "<a href=\"$thickbox_link\" class=\"thickbox\" title=\"" . $this->title . "\" ><img src=\"" . $this->image_small ."\" alt=\"" . $this->title . "\" /></a>\n";
-		echo "<h4><a href=\"$thickbox_link\" class=\"thickbox\" title=\"" . $this->title . "\">" . $this->title . "</a></h4>\n";
+		$thickbox_link = "#TB_inline?width=630&height=500&inlineId=projectDetails_" . $this->id;
+		?>
+		<div class="portfolio-item">
+			<a href="<?php echo $thickbox_link; ?>" class="thickbox" title="<?php echo $this->title; ?>"><img src="<?php echo $this->image_small; ?>" alt="<?php echo $this->title; ?>" /></a>
+			<h4><a href="<?php echo $thickbox_link; ?>" class="thickbox" title="<?php echo $this->title; ?>"><?php echo $this->title; ?></a></h4>
 		
-		echo "<div id=\"projectDetails_" . $this->id . "\" class=\"modal-hidden-content\">"; 
-		echo "<img src=\"" . $this->image_large . "\" alt=\"" . $this->title . "\" />";
-		echo "<p>" . strftime("%B %Y", strtotime($this->date)) . "</p>";
-		echo "<p>" . $this->description . "</p>";
-		if (!empty($this->link)) {
-			echo "<p><a href=\"" . $this->link . "\">View online</a></p>";
-		}
-		echo "</div>";
-		
-		echo "</div>\n";
+			<div id="projectDetails_<?php echo $this->id; ?>" class="modal-hidden-content">
+				<img src="<?php echo $this->image_large; ?>" alt="<?php echo $this->title; ?>" />
+				<p><?php echo strftime("%B %Y", strtotime($this->date)); ?></p>
+				<p><?php echo $this->description; ?></p>";
+				<?php
+				if (!empty($this->link)) { ?>
+				<p><a href="<?php echo $this->link; ?>">View online</a></p>
+				<?php }	?>
+			</div>
+		</div>
+		<?php
 	}
 } // End of Item{}
 

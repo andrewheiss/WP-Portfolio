@@ -561,36 +561,28 @@ class PortfolioDisplay extends PortfolioAdmin
 		$results = mysql_query($query);
 		
 		while ($type = mysql_fetch_array($results)) {
-			$this->buildTypeHead($type['type_title'], $type['type_description'], $type['id_type']);
+			$this->buildSection($type['type_title'], $type['type_description'], $type['id_type']);
 		}
 		
 	}
 	
-	function buildTypeHead($title, $description, $id)
+	function buildSection($title, $description, $id)
 	{
 		echo "<h3>$title</h3>";
 		echo "<p>$description</p>";
 		
-		$query1 = "SELECT * FROM $this->portfolio_table WHERE fk_type = $id";
+		$query1 = "SELECT * FROM $this->portfolio_table WHERE fk_type = $id AND project_visible = 1 ORDER BY project_date DESC";
 		$getresults = mysql_query($query1);
 		
 		echo "<div class=\"portfolio-section web\">\n";
 		
 		$i = 0;
 
-		while ($item = mysql_fetch_array($getresults)) {
+		while ($row = mysql_fetch_array($getresults)) {
 			$i++;
-			$thickbox_link = "#TB_inline?width=630&height=500&inlineId=projectDetails_$item[id_project]";
-			echo "<div class=\"portfolio-item\">\n";
-			echo "<a href=\"$thickbox_link\" class=\"thickbox\" title=\"$item[project_title]\" ><img src=\"$item[project_image_small]\" alt=\"$item[project_title]\" /></a>\n";
-			echo "<h4><a href=\"$thickbox_link\" class=\"thickbox\" title=\"$item[project_title]\" class=\"external\">$item[project_title]</a></h4>\n";
 			
-			echo "<div id=\"projectDetails_$item[id_project]\" class=\"modal-hidden-content\">"; 
-			echo "<img src=\"$item[project_image_large]\" alt=\"$item[project_title]\" />";
-			echo "<p>$item[project_description]</p>";
-			echo "</div>";
+			$item = new Item($row);
 			
-			echo "</div>\n";
 			if ($i % 3 == 0) {
 				// echo "<br class=\"clearfloat\" />\n";
 			}
@@ -606,4 +598,41 @@ class PortfolioDisplay extends PortfolioAdmin
 } // End of PortfolioDisplay{}
 
 
+/**
+* Item
+*/
+class Item {
+	
+	private $id, $title, $description, $image_large, $image_small, $link, $date;
+	
+	function __construct($row) {
+		$this->id = $row['id_project'];
+		$this->title = $row['project_title'];
+		$this->description = $row['project_description'];
+		$this->image_large = $row['project_image_large'];
+		$this->image_small = $row['project_image_small'];
+		$this->link = $row['project_link'];
+		$this->date = $row['project_date'];
+		
+		$this->displayDetails();
+	}
+	
+	private function displayDetails() {
+		$thickbox_link = "#TB_inline?width=630&height=500&inlineId=projectDetails_".$this->id;
+		echo "<div class=\"portfolio-item\">\n";
+		echo "<a href=\"$thickbox_link\" class=\"thickbox\" title=\"" . $this->title . "\" ><img src=\"" . $this->image_small ."\" alt=\"" . $this->title . "\" /></a>\n";
+		echo "<h4><a href=\"$thickbox_link\" class=\"thickbox\" title=\"" . $this->title . "\">" . $this->title . "</a></h4>\n";
+		
+		echo "<div id=\"projectDetails_" . $this->id . "\" class=\"modal-hidden-content\">"; 
+		echo "<img src=\"" . $this->image_large . "\" alt=\"" . $this->title . "\" />";
+		echo "<p>" . strftime("%B %Y", strtotime($this->date)) . "</p>";
+		echo "<p>" . $this->description . "</p>";
+		if (!empty($this->link)) {
+			echo "<p><a href=\"" . $this->link . "\">View online</a></p>";
+		}
+		echo "</div>";
+		
+		echo "</div>\n";
+	}
+} // End of Item{}
 

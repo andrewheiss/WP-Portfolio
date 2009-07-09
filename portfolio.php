@@ -169,7 +169,8 @@ class PortfolioAdmin {
 	function processForm() {
 		$title = wp_filter_nohtml_kses($_POST['project_title']);
 		$description = wp_filter_kses($_POST['project_description']); // FIXME: This strips out <p>s, but shouldn't
-		$image = wp_filter_kses($_POST['project_image']);
+		$image_large = wp_filter_kses($_POST['project_image_large']);
+		$image_small = wp_filter_kses($_POST['project_image_small']);
 		$link = wp_filter_nohtml_kses($_POST['project_link']);
 		$date = strftime("%Y-%m-%d %H:%M:%S", strtotime(wp_filter_nohtml_kses($_POST['project_date'])));
 		$type = wp_filter_nohtml_kses($_POST['project_type']);
@@ -179,10 +180,10 @@ class PortfolioAdmin {
 		$id = intval($_POST['id_project']);
 		
 		$query = "INSERT INTO $this->portfolio_table 
-		(id_project, fk_type, project_title, project_description, project_image, project_link, project_date, project_visible) 
-		VALUES ('$id', '$type', '$title', '$description', '$image', '$link', '$date', '$visible') 
+		(id_project, fk_type, project_title, project_description, project_image_large, project_image_small, project_link, project_date, project_visible) 
+		VALUES ('$id', '$type', '$title', '$description', '$image_large', '$image_small', '$link', '$date', '$visible') 
 		ON DUPLICATE KEY
-		UPDATE fk_type = '$type', project_title = '$title', project_description = '$description', project_image = '$image', project_link = '$link', project_date = '$date', project_visible = '$visible'";
+		UPDATE fk_type = '$type', project_title = '$title', project_description = '$description', project_image_large = '$image_large', project_image_small = '$image_small', project_link = '$link', project_date = '$date', project_visible = '$visible'";
 		
 		$updateEntry = mysql_query($query);
 		$result_id = mysql_insert_id();
@@ -385,7 +386,7 @@ class PortfolioAdmin {
 					<td><input type="text" name="type_title" value="<?php echo $title; ?>" /></td>
 				</tr>
 				<tr valign="top">
-					<th scope="row">Project Description</th>
+					<th scope="row">Type Description</th>
 					<td><textarea name="type_description" rows="8" cols="40"><?php echo $description; ?></textarea></td>
 				</tr>
 				<tr valign="top">
@@ -434,7 +435,8 @@ class PortfolioAdmin {
 				$id = trim(mysql_result($result, 0, "id_project"));
 				$title = trim(mysql_result($result, 0, "project_title"));
 				$description = trim(mysql_result($result, 0, "project_description"));
-				$image = trim(mysql_result($result, 0, "project_image"));
+				$image_large = trim(mysql_result($result, 0, "project_image_large"));
+				$image_small = trim(mysql_result($result, 0, "project_image_small"));
 				$link = trim(mysql_result($result, 0, "project_link"));
 				$date = strftime("%B %e, %Y %T", strtotime(trim(mysql_result($result, 0, "project_date"))));
 				$visible = trim(mysql_result($result, 0, "project_visible")); 
@@ -450,7 +452,8 @@ class PortfolioAdmin {
 			$id = $_POST['id_project'];
 			$title = $_POST['project_title'];
 			$description = $_POST['project_description'];
-			$image = $_POST['project_image'];
+			$image_large = $_POST['project_image_large'];
+			$image_small = $_POST['project_image_small'];
 			$link = $_POST['project_link'];
 			$date = $_POST['project_date'];
 			$visible = $_POST['project_visible'];
@@ -501,8 +504,12 @@ class PortfolioAdmin {
 					<td><input type="text" name="project_date" value="<?php echo $date; ?>" /></td>
 				</tr>
 				<tr valign="top">
-					<th scope="row">Project Image</th>
-					<td><input type="text" name="project_image" value="<?php echo $image; ?>" /></td>
+					<th scope="row">Large Project Image</th>
+					<td><input type="text" name="project_image_large" value="<?php echo $image_large; ?>" /></td>
+				</tr>
+				<tr valign="top">
+					<th scope="row">Small Project Image</th>
+					<td><input type="text" name="project_image_small" value="<?php echo $image_small; ?>" /></td>
 				</tr>
 				<tr valign="top">
 					<th scope="row">Project Description</th>
@@ -573,11 +580,13 @@ class PortfolioDisplay extends PortfolioAdmin
 
 		while ($item = mysql_fetch_array($getresults)) {
 			$i++;
+			$thickbox_link = "#TB_inline?width=630&height=500&inlineId=projectDetails_$item[id_project]";
 			echo "<div class=\"portfolio-item\">\n";
-			echo "<a href=\"#TB_inline?height=155&width=300&inlineId=projectDetails_$item[id_project]\" class=\"thickbox\" title=\"$item[project_title]\" ><img src=\"$item[project_image]\" alt=\"$item[project_title]\" /></a>\n";
-			echo "<h4><a href=\"$item[project_link]\" title=\"$item[project_title]\" class=\"external\">$item[project_title]</a></h4>\n";
+			echo "<a href=\"$thickbox_link\" class=\"thickbox\" title=\"$item[project_title]\" ><img src=\"$item[project_image_small]\" alt=\"$item[project_title]\" /></a>\n";
+			echo "<h4><a href=\"$thickbox_link\" class=\"thickbox\" title=\"$item[project_title]\" class=\"external\">$item[project_title]</a></h4>\n";
 			
 			echo "<div id=\"projectDetails_$item[id_project]\" class=\"modal-hidden-content\">"; 
+			echo "<img src=\"$item[project_image_large]\" alt=\"$item[project_title]\" />";
 			echo "<p>$item[project_description]</p>";
 			echo "</div>";
 			

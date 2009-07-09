@@ -383,7 +383,7 @@ class PortfolioAdmin {
 			<table class="form-table">
 				<tr valign="top">
 					<th scope="row">Type Title</th>
-					<td><input type="text" name="type_title" value="<?php echo $title; ?>" /></td>
+					<td><input type="text" name="type_title" size="45" value="<?php echo $title; ?>" /></td>
 				</tr>
 				<tr valign="top">
 					<th scope="row">Type Description</th>
@@ -478,7 +478,7 @@ class PortfolioAdmin {
 			<table class="form-table">
 				<tr valign="top">
 					<th scope="row">Project Title</th>
-					<td><input type="text" name="project_title" value="<?php echo $title; ?>" /></td>
+					<td><input type="text" name="project_title" size="45" value="<?php echo $title; ?>" /></td>
 				</tr>
 				<tr valign="top">
 					<th scope="row">Project Type</th>
@@ -497,7 +497,7 @@ class PortfolioAdmin {
 				</tr>
 				<tr valign="top">
 					<th scope="row">Project URL</th>
-					<td><input type="text" name="project_link" value="<?php echo $link; ?>" /></td>
+					<td><input type="text" name="project_link" size="45" value="<?php echo $link; ?>" /></td>
 				</tr>
 				<tr valign="top">
 					<th scope="row">Project Date</th>
@@ -505,11 +505,11 @@ class PortfolioAdmin {
 				</tr>
 				<tr valign="top">
 					<th scope="row">Large Project Image</th>
-					<td><input type="text" name="project_image_large" value="<?php echo $image_large; ?>" /></td>
+					<td><input type="text" name="project_image_large" size="45" value="<?php echo $image_large; ?>" /></td>
 				</tr>
 				<tr valign="top">
 					<th scope="row">Small Project Image</th>
-					<td><input type="text" name="project_image_small" value="<?php echo $image_small; ?>" /></td>
+					<td><input type="text" name="project_image_small" size="45" value="<?php echo $image_small; ?>" /></td>
 				</tr>
 				<tr valign="top">
 					<th scope="row">Project Description</th>

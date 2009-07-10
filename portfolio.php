@@ -60,7 +60,7 @@ class PortfolioAdmin {
 	function manageTypes() {
 		// Delete types in bulk
 		if ($_POST['action'] == 'delete' && count($_POST['type_check']) > 0) {
-			if ($this->deleteItems('type')) {
+			if ($this->delete('type')) {
 				$this->showListTypes("Portfolio types successfully deleted");
 				return;
 			}
@@ -74,11 +74,12 @@ class PortfolioAdmin {
 			$typeID = intval($_GET['type']);
 			
 			if (isset($_POST['submit_check'])) { // If the form was submitted...
-				 if ($form_errors = $this->validateType()) {
-					 $this->editIndividualType($typeID, $form_errors);
-				 } else {
-					 $this->processTypes();
-				 }
+				$type = new Type($_POST);
+				if ($form_errors = $type->validate()) {
+					$this->editIndividualType($typeID, $form_errors);
+				} else {
+					$type->process();
+				}
 			} else {
 				$this->editIndividualType($typeID); // If not, just edit the type
 			}
@@ -89,7 +90,7 @@ class PortfolioAdmin {
 
 		// Delete entries in bulk
 		if ($_POST['action'] == 'delete' && count($_POST['entry_check']) > 0) {
-			if ($this->deleteItems('entry')) {
+			if ($this->delete('entry')) {
 				$this->showList("Portfolio entries successfully deleted");
 				return;
 			}
@@ -103,118 +104,19 @@ class PortfolioAdmin {
 			$itemID = intval($_GET['entry']);
 			
 			if (isset($_POST['submit_check'])) { // If the form was submitted...
-				 if ($form_errors = $this->validateForm()) {
-					 $this->editIndividual($itemID, $form_errors);
-				 } else {
-					 $this->processForm();
-				 }
+				$item = new Item($_POST);
+				
+				if ($form_errors = $item->validate()) {
+					$this->editIndividual($itemID, $form_errors);
+				} else {
+					$item->process();
+				}
 			} else {
 				$this->editIndividual($itemID); // If not, just edit the entry
 			}
 		}
 		
 	}
-	
-	function deleteItems($type) {
-		if ($type == "entry") {
-			$items = implode(",", $_POST['entry_check']); 
-			$table = $this->portfolio_table;
-			$column = "id_project";
-		} elseif ($type == "type") {
-			$items = implode(",", $_POST['type_check']); 
-			$table = $this->portfolio_types_table;
-			$column = "id_type";
-		}
-		
-		$query = "DELETE FROM $table WHERE $column IN ($items)";
-		
-		$result = mysql_query($query);
-		if ($result) {
-			return true;
-		}
-	}
-	
-	function editTypes() {
-		echo "Here's where you can manage the types of projects";
-	}
-	
-	function processTypes()
-	{
-		$title = wp_filter_nohtml_kses($_POST['type_title']);
-		$description = wp_filter_kses($_POST['type_description']); // FIXME: This strips out <p>s, but shouldn't
-		$order = intval($_POST['type_order']);
-		
-		$id = intval($_POST['id_type']);
-		
-		$query = "INSERT INTO $this->portfolio_types_table
-		(id_type, type_title, type_description, type_order)
-		VALUES ('$id', '$title', '$description', '$order')
-		ON DUPLICATE KEY
-		UPDATE type_title = '$title', type_description = '$description', type_order = '$order'";
-		
-		$updateType = mysql_query($query);
-		$result_id = mysql_insert_id();
-		
-		$title = stripslashes($title);
-		
-		if ($result_id == $id) {
-			$message = "$title successfully updated";
-			$this->editIndividualType($id, "", $message);
-		} else {
-			$message = "$title successfully added";
-			$this->showListTypes($message);
-		}
-	}
-	
-	function processForm() {
-		$title = wp_filter_nohtml_kses($_POST['project_title']);
-		$description = wp_filter_kses($_POST['project_description']); // FIXME: This strips out <p>s, but shouldn't
-		$image_large = wp_filter_kses($_POST['project_image_large']);
-		$image_small = wp_filter_kses($_POST['project_image_small']);
-		$link = wp_filter_nohtml_kses($_POST['project_link']);
-		$date = strftime("%Y-%m-%d %H:%M:%S", strtotime(wp_filter_nohtml_kses($_POST['project_date'])));
-		$type = wp_filter_nohtml_kses($_POST['project_type']);
-		$visible = (isset($_POST['project_visible'])) ? "1" : "0" ;
-		
-		// FUTURE: Use Markdown instead
-		$id = intval($_POST['id_project']);
-		
-		$query = "INSERT INTO $this->portfolio_table 
-		(id_project, fk_type, project_title, project_description, project_image_large, project_image_small, project_link, project_date, project_visible) 
-		VALUES ('$id', '$type', '$title', '$description', '$image_large', '$image_small', '$link', '$date', '$visible') 
-		ON DUPLICATE KEY
-		UPDATE fk_type = '$type', project_title = '$title', project_description = '$description', project_image_large = '$image_large', project_image_small = '$image_small', project_link = '$link', project_date = '$date', project_visible = '$visible'";
-		
-		$updateEntry = mysql_query($query);
-		$result_id = mysql_insert_id();
-		
-		$title = stripslashes($title);
-		
-		if ($result_id == $id) {
-			$message = "$title successfully updated";
-			$this->editIndividual($id, "", $message);
-		} else {
-			$message = "$title successfully added";
-			$this->showList($message);
-		}
-	}
-	
-	function validateForm() {
-		if (empty($_POST['project_title'])) {
-			$errors[] = "Please type a project title.";
-		}
-		
-		return $errors;
-	}
-	
-	function validateType() {
-		if (empty($_POST['type_title'])) {
-			$errors[] = "Please type a type title.";
-		}
-		
-		return $errors;
-	}
-	
 	
 	function showListTypes($message = "") {		
 		$query = "SELECT a.*, COUNT(v.id_project) AS projectCount
@@ -348,10 +250,12 @@ class PortfolioAdmin {
 			if (mysql_num_rows($result)) {
 				$already_filled = true;
 				
-				$id = trim(mysql_result($result, 0, "id_type"));
-				$title = trim(mysql_result($result, 0, "type_title"));
-				$description = trim(mysql_result($result, 0, "type_description"));
-				$order = trim(mysql_result($result, 0, "type_order"));
+				$type = new Type(mysql_fetch_array($result));
+				
+				$id = $type->id;
+				$title = $type->title;
+				$description = $type->description;
+				$order = $type->order;
 				
 				$pageTitle = "Edit $title";
 			} else {
@@ -362,7 +266,7 @@ class PortfolioAdmin {
 		if (!empty($errors)) {
 			$id = $_POST['id_type'];
 			$title = $_POST['type_title'];
-			$description = $_POST['type_description'];
+			$description = stripslashes($_POST['type_description']);
 			$order = $_POST['type_order'];
 		} ?>
 	<div class="wrap">
@@ -432,15 +336,17 @@ class PortfolioAdmin {
 			if (mysql_num_rows($result)) {
 				$already_filled = true;
 				
-				$id = trim(mysql_result($result, 0, "id_project"));
-				$title = trim(mysql_result($result, 0, "project_title"));
-				$description = trim(mysql_result($result, 0, "project_description"));
-				$image_large = trim(mysql_result($result, 0, "project_image_large"));
-				$image_small = trim(mysql_result($result, 0, "project_image_small"));
-				$link = trim(mysql_result($result, 0, "project_link"));
-				$date = strftime("%B %e, %Y %T", strtotime(trim(mysql_result($result, 0, "project_date"))));
-				$visible = trim(mysql_result($result, 0, "project_visible")); 
-				$type = trim(mysql_result($result, 0, "fk_type")); 
+				$item = new Item(mysql_fetch_array($result));
+				
+				$id = $item->id;
+				$title = $item->title;
+				$description = $item->description;
+				$image_large = $item->image_large;
+				$image_small = $item->image_small;
+				$link = $item->link;
+				$date = strftime("%B %e, %Y %T", strtotime($item->date));
+				$visible = $item->visible;
+				$type = $item->type;
 				
 				$pageTitle = "Edit $title";
 			} else {
@@ -536,6 +442,25 @@ class PortfolioAdmin {
 	<?php
 	}
 	
+	function delete($type) {
+		if ($type == "entry") {
+			$items = implode(",", $_POST['entry_check']); 
+			$table = $this->portfolio_table;
+			$column = "id_project";
+		} elseif ($type == "type") {
+			$items = implode(",", $_POST['type_check']); 
+			$table = $this->portfolio_types_table;
+			$column = "id_type";
+		}
+		
+		$query = "DELETE FROM $table WHERE $column IN ($items)";
+		
+		$result = mysql_query($query);
+		if ($result) {
+			return true;
+		}
+	}
+	
 } // End of PortfolioAdmin{}
 
 
@@ -582,17 +507,15 @@ class PortfolioDisplay extends PortfolioAdmin
 			$i++;
 			
 			$item = new Item($row);
+			$item->displayDetails();
 			
 			if ($i % 3 == 0) {
 				// echo "<br class=\"clearfloat\" />\n";
 			}
 		}
 
-		
 		echo "</div>";
-		echo "<br class=\"clearfloat\" />\n";
-		
-		
+		echo "<br class=\"clearfloat\" />\n";		
 	}
 	
 } // End of PortfolioDisplay{}
@@ -601,23 +524,24 @@ class PortfolioDisplay extends PortfolioAdmin
 /**
 * Item
 */
-class Item {
+class Item extends PortfolioAdmin {
 	
-	private $id, $title, $description, $image_large, $image_small, $link, $date;
+	public $id, $title, $description, $image_large, $image_small, $link, $date, $visible, $type;
 	
-	function __construct($row) {
-		$this->id = $row['id_project'];
-		$this->title = $row['project_title'];
-		$this->description = $row['project_description'];
-		$this->image_large = $row['project_image_large'];
-		$this->image_small = $row['project_image_small'];
-		$this->link = $row['project_link'];
-		$this->date = $row['project_date'];
-		
-		$this->displayDetails();
+	function __construct($array) {
+		parent::__construct();
+		$this->id = $array['id_project'];
+		$this->title = $array['project_title'];
+		$this->description = $array['project_description'];
+		$this->image_large = $array['project_image_large'];
+		$this->image_small = $array['project_image_small'];
+		$this->link = $array['project_link'];
+		$this->date = $array['project_date'];
+		$this->visible = $array['project_visible'];
+		$this->type = (isset($array['fk_type'])) ? $array['fk_type'] : $array['project_type'];
 	}
 	
-	private function displayDetails() {
+	public function displayDetails() {
 		$thickbox_link = "#TB_inline?width=630&height=500&inlineId=projectDetails_" . $this->id;
 		?>
 		<div class="portfolio-item">
@@ -636,5 +560,98 @@ class Item {
 		</div>
 		<?php
 	}
+	
+	public function validate() {
+		if (empty($this->title)) {
+			$errors[] = "Please type a project title.";
+		}
+		
+		if (empty($this->description)) {
+			$errors[] = "You need a description!";
+		}
+		
+		return $errors;
+	}
+	
+	public function process() {
+		$id = intval($this->id);
+		$title = wp_filter_nohtml_kses($this->title);
+		// FUTURE: Use Markdown instead
+		$description = wp_filter_kses($this->description); // FIXME: This strips out <p>s, but shouldn't
+		$image_large = wp_filter_kses($this->image_large);
+		$image_small = wp_filter_kses($this->image_small);
+		$link = wp_filter_nohtml_kses($this->link);
+		$date = strftime("%Y-%m-%d %H:%M:%S", strtotime(wp_filter_nohtml_kses($this->date)));
+		$type = wp_filter_nohtml_kses($this->type);
+		$visible = (isset($this->visible)) ? "1" : "0" ;
+		
+		$query = "INSERT INTO $this->portfolio_table 
+		(id_project, fk_type, project_title, project_description, project_image_large, project_image_small, project_link, project_date, project_visible) 
+		VALUES ('$id', '$type', '$title', '$description', '$image_large', '$image_small', '$link', '$date', '$visible') 
+		ON DUPLICATE KEY
+		UPDATE fk_type = '$type', project_title = '$title', project_description = '$description', project_image_large = '$image_large', project_image_small = '$image_small', project_link = '$link', project_date = '$date', project_visible = '$visible'";
+
+		$updateEntry = mysql_query($query) or die (mysql_error());
+		$result_id = mysql_insert_id();
+		
+		$title = stripslashes($title);
+		
+		if ($result_id == $id) {
+			$message = "$title successfully updated";
+			parent::editIndividual($id, "", $message);
+		} else {
+			$message = "$title successfully added";
+			parent::showList($message);
+		}
+	}
 } // End of Item{}
 
+/**
+* Type
+*/
+class Type extends PortfolioAdmin
+{
+	public $id, $title, $description, $order;
+	
+	function __construct($array) {
+		parent::__construct();
+		$this->id = $array['id_type'];
+		$this->title = $array['type_title'];
+		$this->description = $array['type_description'];
+		$this->order = $array['type_order'];
+	}
+	
+	public function process() {
+		$id = intval($this->id);
+		$title = wp_filter_nohtml_kses($this->title);
+		$description = wp_filter_kses($this->description); // FIXME: This strips out <p>s, but shouldn't
+		$order = intval($this->order);
+		
+		$query = "INSERT INTO $this->portfolio_types_table
+		(id_type, type_title, type_description, type_order)
+		VALUES ('$id', '$title', '$description', '$order')
+		ON DUPLICATE KEY
+		UPDATE type_title = '$title', type_description = '$description', type_order = '$order'";
+		
+		$updateType = mysql_query($query);
+		$result_id = mysql_insert_id();
+		
+		$title = stripslashes($title);
+		
+		if ($result_id == $id) {
+			$message = "$title successfully updated";
+			parent::editIndividualType($id, "", $message);
+		} else {
+			$message = "$title successfully added";
+			parent::showListTypes($message);
+		}
+	}
+	
+	public function validate() {
+		if (empty($this->title)) {
+			$errors[] = "Please type a type title.";
+		}
+		
+		return $errors;
+	}
+}

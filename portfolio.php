@@ -12,7 +12,12 @@ Author URI: http://www.andrewheiss.com/
 $portfolioAdmin = new PortfolioAdmin();
 $portfolioDisplay = new PortfolioDisplay();
 add_action('admin_menu', array(&$portfolioAdmin, 'addAdminMenu'));
-add_filter('the_content', array(&$portfolioDisplay, 'insertPortfolio'));
+add_filter('ah_portfolio', array(&$portfolioDisplay, 'buildPortfolio'));
+
+function test()
+{
+	echo "This is only a test";
+}
 
 /**
 * WP Portfolio
@@ -59,12 +64,14 @@ class PortfolioAdmin {
 	
 	function manageTypes() {
 		// Delete types in bulk
-		if ($_POST['action'] == 'delete' && count($_POST['type_check']) > 0) {
+		if (($_POST['action'] == 'delete' && count($_POST['type_check']) > 0)) {
 			if ($this->delete('type')) {
 				$this->showListTypes("Portfolio types successfully deleted");
 				return;
 			}
 		}
+		
+		// if (isset($_POST['delete_type']) | isset($_POST['delete_entry'])) { }
 
 		// If an individual type is specified, edit it (and/or validate and process it)
 		// Otherwise, just show the full list of types
@@ -475,18 +482,18 @@ class PortfolioDisplay extends PortfolioAdmin
 		
 	}
 	
-	function insertPortfolio($content) {
-		if (preg_match('{PORTFOLIO}', $content)) {
-			$content = str_replace('{PORTFOLIO}', $this->buildPortfolio(), $content);
-		}
-	}
-	
 	function buildPortfolio() {
-		$query = "SELECT * FROM $this->portfolio_types_table ORDER BY type_order DESC, type_title ASC";
+		$query = "SELECT a.*, COUNT(v.id_project) AS projectCount
+		 FROM $this->portfolio_types_table AS a
+		 LEFT JOIN $this->portfolio_table AS v ON ( v.fk_type = a.id_type )
+		 GROUP BY a.id_type ORDER BY a.type_order DESC, a.type_title ASC";
+		
 		$results = mysql_query($query);
 		
 		while ($type = mysql_fetch_array($results)) {
-			$this->buildSection($type['type_title'], $type['type_description'], $type['id_type']);
+			if ($type['projectCount'] > 0) {
+				$this->buildSection($type['type_title'], $type['type_description'], $type['id_type']);
+			}
 		}
 		
 	}
@@ -494,24 +501,16 @@ class PortfolioDisplay extends PortfolioAdmin
 	function buildSection($title, $description, $id)
 	{
 		echo "<h3>$title</h3>";
-		echo "<p>$description</p>";
+		echo "<p>$description <a id=\"show$id\" href=\"#\">View full portfolio&nbsp;&raquo;</a></p>";
 		
 		$query1 = "SELECT * FROM $this->portfolio_table WHERE fk_type = $id AND project_visible = 1 ORDER BY project_date DESC";
 		$getresults = mysql_query($query1);
 		
-		echo "<div class=\"portfolio-section web\">\n";
+		echo "<div class=\"portfolio-section item$id\">\n";
 		
-		$i = 0;
-
 		while ($row = mysql_fetch_array($getresults)) {
-			$i++;
-			
 			$item = new Item($row);
 			$item->displayDetails();
-			
-			if ($i % 3 == 0) {
-				// echo "<br class=\"clearfloat\" />\n";
-			}
 		}
 
 		echo "</div>";
@@ -542,20 +541,27 @@ class Item extends PortfolioAdmin {
 	}
 	
 	public function displayDetails() {
-		$thickbox_link = "#TB_inline?width=630&height=500&inlineId=projectDetails_" . $this->id;
+		$thickbox_link = "#TB_inline?width=630&amp;height=400&amp;inlineId=projectDetails_" . $this->id;
 		?>
 		<div class="portfolio-item">
 			<a href="<?php echo $thickbox_link; ?>" class="thickbox" title="<?php echo $this->title; ?>"><img src="<?php echo $this->image_small; ?>" alt="<?php echo $this->title; ?>" /></a>
 			<h4><a href="<?php echo $thickbox_link; ?>" class="thickbox" title="<?php echo $this->title; ?>"><?php echo $this->title; ?></a></h4>
+
+			<?php
+			if (!empty($this->link)) { 
+				$ext_link = "<a href=\"$this->link\" class=\"external\">";
+				$ext_link_noclass = "<a href=\"$this->link\">";
+				$ext_link_close = "</a>";
+			} ?>
 		
 			<div id="projectDetails_<?php echo $this->id; ?>" class="modal-hidden-content">
-				<img src="<?php echo $this->image_large; ?>" alt="<?php echo $this->title; ?>" />
-				<p><?php echo strftime("%B %Y", strtotime($this->date)); ?></p>
-				<p><?php echo $this->description; ?></p>";
-				<?php
-				if (!empty($this->link)) { ?>
-				<p><a href="<?php echo $this->link; ?>">View online</a></p>
-				<?php }	?>
+				<div class="big-portfolio-picture"><?php echo $ext_link_noclass; ?><img src="<?php echo $this->image_large; ?>" alt="<?php echo $this->title; ?>" /><?php echo $ext_link_close; ?></div>
+				<div class="portfolio-detail-header">
+					<h4 class="project-title"><?php echo $ext_link . $this->title . $ext_link_close; ?></h4>
+					<p class="project-date"><?php echo strftime("%B %Y", strtotime($this->date)); ?></p>
+					<br class="clearfloat" />
+				</div>
+				<p><?php echo $this->description; ?></p>;
 			</div>
 		</div>
 		<?php

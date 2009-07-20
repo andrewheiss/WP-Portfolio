@@ -1,7 +1,7 @@
 <?php
 /*
 Plugin Name: AndrewHeiss.com Portfolio
-Version: 0.1
+Version: 1.0
 Plugin URI: http://www.andrewheiss.com
 Description: Displays my custom portfolio
 Author: Andrew Heiss
@@ -13,11 +13,6 @@ $portfolioAdmin = new PortfolioAdmin();
 $portfolioDisplay = new PortfolioDisplay();
 add_action('admin_menu', array(&$portfolioAdmin, 'addAdminMenu'));
 add_filter('ah_portfolio', array(&$portfolioDisplay, 'buildPortfolio'));
-
-function test()
-{
-	echo "This is only a test";
-}
 
 /**
 * WP Portfolio
@@ -45,10 +40,10 @@ class PortfolioAdmin {
 	}
 	
 	function addAdminMenu() {
-		add_menu_page('Portfolio Settings', 'Portfolio', 8, __FILE__, array(&$this, 'portfolioOptions'));
-		add_submenu_page(__FILE__, 'Portfolio settings', 'Settings', 8, __FILE__, array(&$this, 'portfolioOptions'));
-		add_submenu_page(__FILE__, 'Manage Portfolio Entries', 'Edit Portfolio Entries', 8, 'portfolio-edit', array(&$this, 'manageEntries'));
-		add_submenu_page(__FILE__, 'Manage Project Types', 'Manage Project Types', 8, 'portfolio-types-edit', array(&$this, 'manageTypes'));	
+		add_menu_page('Portfolio Settings', 'Portfolio', 7, __FILE__, array(&$this, 'portfolioOptions'));
+		add_submenu_page(__FILE__, 'Portfolio settings', 'Settings', 7, __FILE__, array(&$this, 'portfolioOptions'));
+		add_submenu_page(__FILE__, 'Manage Portfolio Entries', 'Edit Portfolio Entries', 7, 'portfolio-edit', array(&$this, 'manageEntries'));
+		add_submenu_page(__FILE__, 'Manage Project Types', 'Manage Project Types', 7, 'portfolio-types-edit', array(&$this, 'manageTypes'));	
 	}
 	
 	function portfolioOptions() {
